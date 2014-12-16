@@ -2,6 +2,9 @@ package parsers;
 
 import app.Ngram;
 import db.DbHandler;
+import db.IProvider;
+import db.InMemoryDb;
+import db.MongoHandler;
 
 import java.io.*;
 import java.sql.SQLException;
@@ -14,36 +17,18 @@ import java.util.Set;
  * Created by daniel on 2014-12-15.
  */
 public class PublicationParser {
-    private static final int BUFFER_LIMIT = 100;
+    private IProvider provider;
 
-    private static int MIN_WORD_LENGTH = 1;
-    private static Set<String> stopList = new HashSet<String>(Arrays.asList(""));
-
-    private DbHandler dbHandler;
-
-    private int id;
-    private int authorId;
+    private Object authorId;
     private String publicationName;
     private File publication;
 
-    public PublicationParser(int authorId, String name, File publication) {
-        dbHandler = DbHandler.getInstance();
+    public PublicationParser(Object authorId, String name, File publication) {
+        provider = InMemoryDb.getInstance();
 
         this.authorId = authorId;
         this.publicationName = name;
         this.publication = publication;
-    }
-
-    public boolean insertOrLoad() {
-        try {
-            id = dbHandler.insertPublication(authorId, publicationName);
-
-            return true;
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-
-        return false;
     }
 
     public boolean parse() {
@@ -57,14 +42,16 @@ public class PublicationParser {
                 for(String token : tokens) {
                     token = fixToken(token);
 
-                    if(token.length() < MIN_WORD_LENGTH || stopList.contains(token)) {
+                    if(token.length() < IProvider.MIN_WORD_LENGTH || IProvider.stopList.contains(token)) {
+                        flush(buffer);
+                        buffer.clear();
                         continue;
                     }
 
                     buffer.add(fixToken(token));
                 }
 
-                if(buffer.size() > BUFFER_LIMIT) {
+                if(buffer.size() > IProvider.BUFFER_LIMIT) {
                     flush(buffer);
                 }
             }
@@ -88,11 +75,11 @@ public class PublicationParser {
     }
 
     private String fixToken(String token) {
-        return token.replaceAll("[^a-zA-Z0-9]", "");
+        return token.replaceAll("[^a-zA-Z0-9']", "").toLowerCase();
     }
 
     private void flush(LinkedList<String> buffer) {
-        System.out.println("Flushing...");
+       // System.out.println("Flushing...");
         long start = System.currentTimeMillis();
         while(buffer.size() > 2) {
             String first = buffer.poll(),
@@ -100,15 +87,11 @@ public class PublicationParser {
                     third = buffer.get(1);
             Ngram ngram = new Ngram(new String[] {first, second, third});
 
-            try {
-                int ngramId = dbHandler.insertNgram(ngram);
+            Object ngramId = provider.insertNgram(ngram);
 
-                dbHandler.addPublicationNgram(id, ngramId);
-            } catch (SQLException e) {
-                e.printStackTrace();
-            }
+            provider.insertAuthorNgram(authorId, ngramId);
         }
-        System.out.println("Done flushing! Took " + (System.currentTimeMillis() - start)/1000 + "s");
-        System.out.println("Moving on...");
+      //  System.out.println("Done flushing! Took " + (System.currentTimeMillis() - start)/1000 + "s");
+      //  System.out.println("Moving on...");
     }
 }

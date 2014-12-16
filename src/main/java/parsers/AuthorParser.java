@@ -1,47 +1,30 @@
 package parsers;
 
-import app.Ngram;
-import db.DbHandler;
+import db.IProvider;
+import db.InMemoryDb;
 
 import java.io.*;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
 
 /**
  * Created by daniel on 2014-12-10.
  */
 public class AuthorParser {
-    private DbHandler dbHandler;
+    private IProvider provider;
     private String authorName;
-    private int id;
+    private Object id;
 
     public AuthorParser(String name) {
-        dbHandler = DbHandler.getInstance();
+        provider = InMemoryDb.getInstance();
         authorName = name;
     }
 
-    public boolean insertOrLoad() {
-        try {
-            id = dbHandler.insertAuthor(authorName);
-
-            return true;
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-
-        return false;
+    public void insertOrLoad() {
+        id = provider.insertAuthor(authorName);
     }
 
-    private void parse(File[] publications) throws SQLException, IOException {
+    public void parse(File[] publications)  {
         for(File publication : publications) {
             PublicationParser parser = new PublicationParser(id, publication.getName(), publication);
-            if(!parser.insertOrLoad()) {
-                System.out.println("Failed to insert or load publication " + publication.getName());
-                continue;
-            }
 
             System.out.println("Parsing publication " + publication.getName());
             if(parser.parse()) {
@@ -66,10 +49,12 @@ public class AuthorParser {
             }
 
             AuthorParser parser = new AuthorParser(command);
-            if(!parser.insertOrLoad()) {
+            parser.insertOrLoad();
+            if(parser.id == null) {
                 System.out.println("Failed to insert or load the author " + command);
                 continue;
             }
+
             System.out.println(parser.id);
             System.out.println("Enter folder path:");
             File folder = new File(AuthorParser.class.getResource(reader.readLine()).toURI());
