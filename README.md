@@ -1,4 +1,4 @@
-ngram-year-predictor
+ngram-text-categorization
 ====================
 
-Predict when some text was written using n-grams from Google.
+Predict who wrote some text by modelling texts and authors with n-grams.
